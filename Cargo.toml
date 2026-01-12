@@ -1,0 +1,11 @@
+[package]
+name = "HardsciSandbox"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.17.2"
+fixed = "1.29.0"
+
+#   Scripting
+mlua = { version="0.11.4", features=["lua54", "vendored"] }
