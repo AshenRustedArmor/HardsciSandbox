@@ -86,13 +86,22 @@ impl WorldFrame {
 	}
 }
 
-impl LocalFrame {
-}
-
 impl From<LocalFrame> for Transform {
 	fn from(frame: LocalFrame) -> Self { Transform {
 			translation: frame.pose.pos.as_vec3(),
 			rotation: frame.pose.rot.as_quat(),
 			scale: Vec3::ONE,
 	}	}
+}
+
+//		Systems
+pub fn System_WorldIntegrate(
+	time: Res<Time>,
+	mut query: Query<&mut WorldFrame>,
+) {
+	let dt = time.delta_seconds_f64();
+
+	query.par_iter_mut().for_each(|mut frame| {
+		
+	});
 }

@@ -5,7 +5,11 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.17.2"
+
+#	Math
 fixed = "1.29.0"
+derive_more = "2.1.1"
+num-traits = "0.2.19"
 
 #   Scripting
 mlua = { version="0.11.4", features=["lua54", "vendored"] }
