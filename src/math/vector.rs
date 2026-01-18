@@ -149,11 +149,7 @@ impl TypeVec3 for FixVec3 {
 
 	fn rotate(self, rot: DQuat) -> Self {
 		//	Upcast for multiplication
-		let v_wide = FixWide3::new(
-            FixWide::from_num(self.x),
-            FixWide::from_num(self.y),
-            FixWide::from_num(self.z),
-        );
+		let v_wide = FixWide3 = self.to();
 
 		let qW_wide = FixWide::from_num(rot.w);
         let qXYZ_wide = FixWide3::new(
