@@ -9,7 +9,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign};
 //	Pose - position and orientation
 #[derive(Clone, Copy, Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct Pose<V: Vector3> {
+pub struct Pose<V: TypeVec3> {
     pub origin: V,
     pub angles: DQuat,
 }
@@ -17,7 +17,7 @@ pub struct Pose<V: Vector3> {
 //	Twist - linear & angular velocity
 #[derive(Clone, Copy, Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct Pose<V: Vector3> {
+pub struct Pose<V: TypeVec3> {
     pub lin: V,
     pub ang: DVec3,
 }
