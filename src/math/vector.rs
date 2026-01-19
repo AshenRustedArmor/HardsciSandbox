@@ -6,7 +6,7 @@ use std::ops::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssi
 //*
 use fixed::{FixedI128, traits::{FromFixed, ToFixed}};
 use fixed::types::{I48F16, I2F62, extra::U62};
-//use derive_more::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
+use derive_more::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
 // */
 
 //		Vector abstraction
@@ -24,6 +24,7 @@ pub trait TypeVec3:
 {
 	type Scalar: Clone + Copy
 		+ PartialEq + PartialOrd 
+		+ ToFixed + FromFixed
 		+ Debug;
 
 	//	Constructors
@@ -54,8 +55,8 @@ macro_rules! define_fixed_vec3 {
 	($Name:ident, $Scalar:ty, $Wide:ty) => { 
 		paste::paste!{
 			//	Internal struct defs
-			define_fixed_vec3!(@internal_struct [<$Name Wide>], $Wide)
-			define_fixed_vec3!(@internal_struct $Name, $Scalar)
+			define_fixed_vec3!(@internal_struct [<$Name Wide>], $Wide);
+			define_fixed_vec3!(@internal_struct $Name, $Scalar);
 
 			impl TypeVec3 for $Name {
 				type Scalar = $Scalar;
@@ -81,14 +82,14 @@ macro_rules! define_fixed_vec3 {
 				//	Geometric ops
 				fn rotate(self, rot: DQuat) -> Self {
 					//	Upconversion
-					let v_xyz = [<$Name Wide>] = self.to();
+					let v_xyz: [<$Name Wide>] = self.to();
 
 					let q_w = <$Wide>::from_num(rot.w);
 					let q_xyz = [<$Name Wide>]::new(rot.x, rot.y, rot.z);
 
 					//	Math:	q X (q X v + v*w)
 					let t1 = q_xyz.cross(v_xyz) + (v_xyz * q_w);
-					let res = v_xyz + (q_xyz.cross(t1) * <$Wide>::from_num(2))
+					let res = v_xyz + (q_xyz.cross(t1) * <$Wide>::from_num(2));
 
 					//	Downconversion
 					res.to()
@@ -141,23 +142,23 @@ macro_rules! define_fixed_vec3 {
 		impl $Name {
 			//		Constructors
 			//	No zero constructor - easy to define const
-			pub const ZERO: Self = Self { x: <$Scalar>::ZERO, y: <$Scalar>::ZERO, z: <$Scalar>::ZERO }
+			pub const ZERO: Self = Self { x: <$Scalar>::ZERO, y: <$Scalar>::ZERO, z: <$Scalar>::ZERO };
 
 			//	boilerplate: new() constructor accepts any type with trait ToFixed
 			#[inline(always)] pub fn new<N: ToFixed>(x: N, y: N, z: N) -> Self { Self{ 
-				x: <$Scalar>::from_num(x),
-				y: <$Scalar>::from_num(y),
-				z: <$Scalar>::from_num(z), 
+				x: x.to_fixed(),
+				y: y.to_fixed(),
+				z: z.to_fixed(), 
 			} }
 
 			//		Access/conversion
 			//	boilerplate: to() constructor casts to any type with trait FromFixed
 			#[inline] pub fn to<V>(self) -> V where 
-				V: TypeVec3, V::Scalar: FromFixed, 
+				V: TypeVec3, V::Scalar: ToFixed, 
 			{	V::new(
-					V::Scalar::from_num(self.x),
-					V::Scalar::from_num(self.y),
-					V::Scalar::from_num(self.z),
+					self.x.to_fixed::<V::Scalar>(),
+					self.y.to_fixed::<V::Scalar>(),
+					self.z.to_fixed::<V::Scalar>(),
 			)	}
 
 			//		Algebraic ops
@@ -199,7 +200,7 @@ impl TypeVec3 for DVec3 {
 	//	Arithmetic
 	#[inline(always)] fn dot(self, other: Self) -> f64 { self.dot(other) }
 	#[inline(always)] fn cross(self, other: Self) -> Self { self.cross(other) }
-	#[inline(always)] fn mag2(self) -> f64 { self.mag2() }
+	#[inline(always)] fn mag2(self) -> f64 { self.dot(self) }
 
 	//	Geometry
 	#[inline(always)] fn rotate(self, rot: DQuat) -> Self { rot * self }
