@@ -11,6 +11,7 @@ dependencies = [
  "fixed",
  "mlua",
  "num-traits",
+ "paste",
 ]
 
 [[package]]
