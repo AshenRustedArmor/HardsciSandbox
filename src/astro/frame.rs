@@ -3,50 +3,7 @@
 use bevy::prelude::*;
 use bevy::math::{DVec3, DQuat};
 
-//	Data handling
-use fixed::types::I48F16;
-pub type WorldFixed = I48F16;
-
-//		Structures and components
-//	"primitives"
-pub struct FixVec3 {
-	pub x: I48F16,
-	pub y: I48F16,
-	pub z: I48F16,
-}
-
-impl FixVec3{
-	fn new(x: I48I16, y: I48F16, z: I48F16) -> Self { Self {x, y, z} }
-}
-
-//	Screw theoretic components
-#[derive(Debug, Clone, Copy)]
-pub struct Pose<P, R> {
-	pub pos: P,
-	pub rot: R,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Twist<L, A> {
-	pub lin: L,
-	pub ang: A,
-}
-
-//		ECS
-//	Components
-#[derive(Component, Debug, Clone, Copy)]
-struct WorldFrame {
-	pub pose: Pose<FixVec3, DQuat>,
-	pub twist: Twist<FixVec3, DVec3>,	
-}
-
-#[derive(Component, Debug, Clone, Copy)]
-struct LocalFrame {
-	pub pose: Pose<FixVec3, DQuat>,
-	pub twist: Twist<FixVec3, DVec3>,
-}
-
-//	Component Implementations
+/* Component Implementations
 impl WorldFrame {
 	pub fn to_local(&self, viewer: &WorldFrame) -> LocalFrame {
 		//	Relative pose
@@ -86,22 +43,13 @@ impl WorldFrame {
 	}
 }
 
+impl LocalFrame {
+}
+
 impl From<LocalFrame> for Transform {
 	fn from(frame: LocalFrame) -> Self { Transform {
 			translation: frame.pose.pos.as_vec3(),
 			rotation: frame.pose.rot.as_quat(),
 			scale: Vec3::ONE,
 	}	}
-}
-
-//		Systems
-pub fn System_WorldIntegrate(
-	time: Res<Time>,
-	mut query: Query<&mut WorldFrame>,
-) {
-	let dt = time.delta_seconds_f64();
-
-	query.par_iter_mut().for_each(|mut frame| {
-		
-	});
-}
+} // */
