@@ -30,12 +30,12 @@ pub trait TypeVec3:
 	fn new(x: Self::Scalar, y: Self::Scalar, z: Self::Scalar) -> Self;
 	fn zero() -> Self;
 
-	fn to_f64(self) -> DVec3;
-
-	//	Components
+	//	Access/conversion
 	fn x(&self) -> Self::Scalar;
 	fn y(&self) -> Self::Scalar;
 	fn z(&self) -> Self::Scalar;
+
+	fn to_f64(self) -> DVec3;
 
 	//	Algebraic operations
 	fn dot(self, other: Self) -> Self::Scalar;
@@ -51,7 +51,8 @@ pub trait TypeVec3:
 macro_rules! define_fixed_vec3 {
 	//	1)	public-facing macro
 	//	Creates *all* vector ops, even those between other types
-	($Name:ident, $Scalar:ty, $Wide:ty) => { paste::paste!{
+	($Name:ident, $Scalar:ty, $Wide:ty) => { 
+		paste::paste!{
 			//	Internal struct defs
 			define_fixed_vec3!(@internal_struct [<$Name Wide>], $Wide)
 			define_fixed_vec3!(@internal_struct $Name, $Scalar)
@@ -92,6 +93,8 @@ macro_rules! define_fixed_vec3 {
 					//	Math:	q X (q X v + v*w)
 					let t1 = q_xyz.cross(v_xyz) + (v_xyz * q_w);
 					let res = v_xyz + (q_xyz.cross(t1) * <$Wide>::from_num(2))
+
+					//	Downconversion
 					res.to() //	Handy hack from implementing .to()
 				}
 			}
@@ -100,13 +103,13 @@ macro_rules! define_fixed_vec3 {
 				type Scalar = $Wide;
 
 				//	Constructors
-				#[inline] fn new(x: $Wide, y: $Wide, z: $Wide) -> Self { Self::new(x, y, z) }
-				#[inline] fn zero() -> Self { Self::ZERO }
+				#[inline(always)] fn new(x: $Wide, y: $Wide, z: $Wide) -> Self { Self::new(x, y, z) }
+				#[inline(always)] fn zero() -> Self { Self::ZERO }
 
 				//	Access/conversion
-				#[inline] fn x(&self) -> $Wide { self.x }
-                #[inline] fn y(&self) -> $Wide { self.y }
-                #[inline] fn z(&self) -> $Wide { self.z }
+				#[inline(always)] fn x(&self) -> $Wide { self.x }
+                #[inline(always)] fn y(&self) -> $Wide { self.y }
+                #[inline(always)] fn z(&self) -> $Wide { self.z }
 
 				#[inline] fn to_f64(self) -> DVec3 { self.to_f64() }
 
@@ -140,7 +143,7 @@ macro_rules! define_fixed_vec3 {
 		impl $Name {
 			//	Constructors
 			pub const ZERO: Self = Self { x: <$Scalar>::ZERO, y: <$Scalar>::ZERO, z: <$Scalar>::ZERO }
-			#[inline(always)] pub fn new(x: <$Scalar>, y: <$Scalar>, z: <$Scalar>) -> Self { Self{ x, y, z } }
+			#[inline(always)] pub fn new(x: $Scalar, y: $Scalar, z: $Scalar) -> Self { Self{ x, y, z } }
 
 			//	Access/conversion
 			#[inline] pub fn to<V>(self) -> V where 
@@ -150,9 +153,6 @@ macro_rules! define_fixed_vec3 {
 					V::Scalar::from_num(self.y),
 					V::Scalar::from_num(self.z),
 			)	}
-			#[inline] pub fn to_f64(self) -> DVec3 {
-				DVec3::new(self.x.to_num(), self.y.to_num(), self.z.to_num())
-			}
 
 			//	Algebraic ops
 			#[inline] pub fn dot(self, other: Self) -> $Scalar {
