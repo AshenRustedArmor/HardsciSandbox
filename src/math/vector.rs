@@ -215,7 +215,7 @@ mod tests {
 
 	//		Tests
 	//	Construction
-	fn test_new_generic() {
+	#[test] fn test_new_generic() {
 		let v_i64 = FixVec3::new(1, 2, 3);
 		let v_f64 = FixVec3::new(1., 2., 3.);
 		let v_mix = FixVec3::new(1, 2., 3f32);
@@ -226,7 +226,7 @@ mod tests {
 	}
 
 	//	Arithmetic
-	fn test_rot90() {
+	#[test] fn test_rot90() {
 		let vec = FixVec3::new(1, 0, 0);
 		let rot = DQuat::from_rotation_z(PI / 2.0);
 		let res = vec.rotate(rot);
@@ -237,7 +237,7 @@ mod tests {
 	}
 
 	//	Stability
-	fn test_far_stable() {
+	#[test] fn test_far_stable() {
 		let far_dist = 1.5e13;
 
 		let far = FixVec3::new(far_dist, 0, 0);
@@ -255,7 +255,7 @@ mod tests {
 		assert!(res.y - FixOrigin::from_num(far_dist) < EPS_FP_FAR)
 	}
 
-	fn test_far_precise() {
+	#[test] fn test_far_precise() {
 		let q = DQuat::from_rotation_z(0.12345);
         let q_ = q.inverse();
 
