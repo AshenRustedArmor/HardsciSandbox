@@ -6,7 +6,7 @@ use std::ops::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssi
 //*
 use fixed::{FixedI128, traits::{FromFixed, ToFixed}};
 use fixed::types::{I48F16, I2F62, extra::U62};
-use derive_more::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
+//use derive_more::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
 // */
 
 //		Vector abstraction
