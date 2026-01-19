@@ -4,19 +4,26 @@ use bevy::math::{DQuat, DVec3};
 use std::fmt::Debug;
 use std::ops::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
 //*
-use fixed::{FixedI128, traits::{FromFixed, ToFixed}};
+use fixed::{FixedI128, traits::{Fixed, FromFixed, ToFixed}};
 use fixed::types::{I48F16, I2F62, extra::U62};
-use derive_more::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
+//use derive_more::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
 // */
 
-//		Vector abstraction
-//	Trait
+//		Abstractions
+//	Scalar conversion
+pub trait ToScalar<T> { fn to_scalar(self) -> T; }
+impl ToScalar<f64> for f32 { #[inline(always)] fn to_scalar(self) -> f64 { self as f64 } }
+impl ToScalar<f64> for f64 { #[inline(always)] fn to_scalar(self) -> f64 { self } }
+impl ToScalar<f64> for i32 { #[inline(always)] fn to_scalar(self) -> f64 { self as f64 } }
+impl ToScalar<f64> for usize { #[inline(always)] fn to_scalar(self) -> f64 { self as f64 } }
+
+//	Vector
 pub trait TypeVec3:
 	//	Rust traits
-	Clone + Copy + Debug + Default + PartialEq
+	Clone + Copy + Debug + Default + PartialEq //+ Reflect
 	+ Send + Sync + 'static
 	//	Algebraic traits
-	+ Reflect + Neg<Output = Self>
+	+ Neg<Output = Self>
 	+ Add<Output = Self> + AddAssign
 	+ Sub<Output = Self> + SubAssign
 	+ Mul<Self::Scalar, Output = Self> + MulAssign<Self::Scalar>
@@ -24,11 +31,11 @@ pub trait TypeVec3:
 {
 	type Scalar: Clone + Copy
 		+ PartialEq + PartialOrd 
-		+ ToFixed + FromFixed
+		+ FromFixed + ToFixed
 		+ Debug;
 
 	//	Constructors
-	fn new(x: Self::Scalar, y: Self::Scalar, z: Self::Scalar) -> Self;
+	fn new<X: ToFixed, Y: ToFixed, Z: ToFixed>(x:X, y:Y, z:Z) -> Self;
 	fn zero() -> Self;
 
 	//	Access/conversion
@@ -55,14 +62,19 @@ macro_rules! define_fixed_vec3 {
 	($Name:ident, $Scalar:ty, $Wide:ty) => { 
 		paste::paste!{
 			//	Internal struct defs
-			define_fixed_vec3!(@internal_struct [<$Name Wide>], $Wide);
-			define_fixed_vec3!(@internal_struct $Name, $Scalar);
+			define_fixed_vec3!(@struct_def $Name, $Scalar);
+			define_fixed_vec3!(@impl_ops $Name, $Scalar);
+			define_fixed_vec3!(@impl_to $Scalar, $Wide);
+
+			define_fixed_vec3!(@struct_def [<$Name Wide>], $Wide);
+			define_fixed_vec3!(@impl_ops [<$Name Wide>], $Wide);
+			define_fixed_vec3!(@impl_to $Wide, $Scalar);
 
 			impl TypeVec3 for $Name {
 				type Scalar = $Scalar;
 
 				//	Constructors
-				#[inline] fn new(x: $Scalar, y: $Scalar, z: $Scalar) -> Self { Self{ x, y, z } }
+				#[inline] fn new<X: ToFixed, Y: ToFixed, Z: ToFixed>(x:X, y:Y, z:Z) -> Self { Self::new(x, y, z) }
 				#[inline] fn zero() -> Self { Self::ZERO }
 				
 				//	Access/conversion
@@ -100,7 +112,7 @@ macro_rules! define_fixed_vec3 {
 				type Scalar = $Wide;
 
 				//	Constructors
-				#[inline(always)] fn new(x: $Wide, y: $Wide, z: $Wide) -> Self { Self::new(x, y, z) }
+				#[inline(always)] fn new<X: ToFixed, Y: ToFixed, Z: ToFixed>(x:X, y:Y, z:Z) -> Self { Self::new(x, y, z) }
 				#[inline(always)] fn zero() -> Self { Self::ZERO }
 
 				//	Access/conversion
@@ -124,15 +136,8 @@ macro_rules! define_fixed_vec3 {
 
 	//	2)	boilerplate: internal struct generator
 	//	Creates fixed-point specific vector ops
-	(@internal_struct $Name:ident, $Scalar:ty) => {
-		#[derive(
-			Clone, Copy, Debug, Default, PartialEq,
-			Reflect, Neg,
-			Add, AddAssign, Sub, SubAssign,
-			Mul, MulAssign, Div, DivAssign,
-		)]
-		#[mul(forward)] // Allows Vec * Scalar
-		#[div(forward)] // Allows Vec / Scalar
+	(@struct_def $Name:ident, $Scalar:ty) => {
+		#[derive(Clone, Copy, Debug, Default, PartialEq)] //, Reflect)]
 		pub struct $Name {
 			pub x: $Scalar,
 			pub y: $Scalar,
@@ -145,20 +150,20 @@ macro_rules! define_fixed_vec3 {
 			pub const ZERO: Self = Self { x: <$Scalar>::ZERO, y: <$Scalar>::ZERO, z: <$Scalar>::ZERO };
 
 			//	boilerplate: new() constructor accepts any type with trait ToFixed
-			#[inline(always)] pub fn new<N: ToFixed>(x: N, y: N, z: N) -> Self { Self{ 
-				x: x.to_fixed(),
-				y: y.to_fixed(),
-				z: z.to_fixed(), 
-			} }
+			#[inline(always)] pub fn new<X: ToFixed, Y: ToFixed, Z: ToFixed>(x:X, y:Y, z:Z) -> Self { Self {
+					x: <$Scalar>::from_num(x), 
+					y: <$Scalar>::from_num(y),
+					z: <$Scalar>::from_num(z),
+			}	}
 
 			//		Access/conversion
 			//	boilerplate: to() constructor casts to any type with trait FromFixed
 			#[inline] pub fn to<V>(self) -> V where 
-				V: TypeVec3, V::Scalar: ToFixed, 
+				V: TypeVec3, V::Scalar: FromFixed, 
 			{	V::new(
-					self.x.to_fixed::<V::Scalar>(),
-					self.y.to_fixed::<V::Scalar>(),
-					self.z.to_fixed::<V::Scalar>(),
+					V::Scalar::from_fixed(self.x),
+					V::Scalar::from_fixed(self.y),
+					V::Scalar::from_fixed(self.z),
 			)	}
 
 			//		Algebraic ops
@@ -172,6 +177,62 @@ macro_rules! define_fixed_vec3 {
 			}	}
 		}
 	};
+
+	//	3)	boilerplate: operations
+	(@impl_ops $Name:ident, $Scalar:ty) => {
+		//	-Vector
+		impl Neg for $Name {
+			type Output = Self; 
+			#[inline] fn neg(self) -> Self { Self { x: -self.x, y: -self.y, z: -self.z } }
+		}
+
+		//	Vector +- Vector
+		impl Add for $Name {
+			type Output = Self; 
+			#[inline] fn add(self, rhs: Self) -> Self { Self { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z } }	
+		}
+		impl AddAssign for $Name {
+			#[inline] fn add_assign(&mut self, rhs: Self) { self.x += rhs.x; self.y += rhs.y; self.z += rhs.z; }	
+		}
+
+		impl Sub for $Name {
+			type Output = Self; 
+			#[inline] fn sub(self, rhs: Self) -> Self { Self { x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z } }	
+		}
+		impl SubAssign for $Name {
+			#[inline] fn sub_assign(&mut self, rhs: Self) { self.x -= rhs.x; self.y -= rhs.y; self.z -= rhs.z; }	
+		}
+
+		//	Vector */ Scalar
+		impl Mul<$Scalar> for $Name {
+			type Output = Self; 
+			#[inline] fn mul(self, rhs: $Scalar) -> Self { Self { x: self.x * rhs, y: self.y * rhs, z: self.z * rhs } }
+		}
+		impl MulAssign<$Scalar> for $Name {
+			#[inline] fn mul_assign(&mut self, rhs: $Scalar) { self.x *= rhs; self.y *= rhs; self.z *= rhs; }
+		}
+
+		impl Div<$Scalar> for $Name { 
+			type Output = Self;
+			#[inline] fn div(self, rhs: $Scalar) -> Self { Self { x: self.x / rhs, y: self.y / rhs, z: self.z / rhs } }	
+		}
+		impl DivAssign<$Scalar> for $Name { 
+			#[inline] fn div_assign(&mut self, rhs: $Scalar) { self.x /= rhs; self.y /= rhs; self.z /= rhs; }
+		}
+	};
+
+	//	4) boilerplate: conversions.
+	(@impl_to $Scalar:ty, $Other:ty) => {
+		//	Primitives
+		impl ToScalar<$Scalar> for f64 { #[inline(always)] fn to_scalar(self) -> $Scalar { <$Scalar>::from_num(self) } }
+		impl ToScalar<$Scalar> for f32 { #[inline(always)] fn to_scalar(self) -> $Scalar { <$Scalar>::from_num(self) } }
+		impl ToScalar<$Scalar> for i32 { #[inline(always)] fn to_scalar(self) -> $Scalar { <$Scalar>::from_num(self) } }
+		impl ToScalar<$Scalar> for usize { #[inline(always)] fn to_scalar(self) -> $Scalar { <$Scalar>::from_num(self) } }
+
+		//	Fixed points
+		impl ToScalar<$Scalar> for $Scalar { #[inline(always)] fn to_scalar(self) -> $Scalar { self } }
+		impl ToScalar<$Scalar> for $Other { #[inline(always)] fn to_scalar(self) -> $Scalar { <$Scalar>::from_num(self) } }
+    };
 }
 
 //	Define types
@@ -187,7 +248,9 @@ impl TypeVec3 for DVec3 {
 	type Scalar = f64;
 	
 	//	Constructors
-	#[inline(always)] fn new(x: f64, y: f64, z: f64) -> Self { Self::new(x, y, z) }
+	#[inline(always)] fn new<X: ToScalar<f64>, Y: ToScalar<f64>, Z: ToScalar<f64>>(x:X, y:Y, z:Z) -> Self { 
+		Self::new(x.to_scalar(), y.to_scalar(), z.to_scalar()) 
+	}
 	#[inline(always)] fn zero() -> Self { Self::ZERO }
 
 	//	Access/conversions
