@@ -4,7 +4,7 @@ use bevy::math::{DQuat, DVec3};
 use std::fmt::Debug;
 use std::ops::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
 //*
-use fixed::{FixedI128, traits::FromFixed};
+use fixed::{FixedI128, traits::{FromFixed, ToFixed}};
 use fixed::types::{I48F16, I2F62, extra::U62};
 use derive_more::{Neg, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
 // */
@@ -69,7 +69,7 @@ macro_rules! define_fixed_vec3 {
                 #[inline] fn y(&self) -> $Scalar { self.y }
                 #[inline] fn z(&self) -> $Scalar { self.z }
 				
-				#[inline] fn to_f64(self) -> DVec3 { self.to_f64() 
+				#[inline] fn to_f64(self) -> DVec3 {
 					DVec3::new(self.x.to_num(), self.y.to_num(), self.z.to_num())
 				}
 
@@ -81,21 +81,17 @@ macro_rules! define_fixed_vec3 {
 				//	Geometric ops
 				fn rotate(self, rot: DQuat) -> Self {
 					//	Upconversion
-					let v_xyz = [<$Name Wide>] = self.to(); //	Handy hack from implementing .to()
+					let v_xyz = [<$Name Wide>] = self.to();
 
 					let q_w = <$Wide>::from_num(rot.w);
-					let q_xyz = [<$Name Wide>]::new(
-						<$Wide>::from_num(rot.x),
-						<$Wide>::from_num(rot.y),
-						<$Wide>::from_num(rot.z),
-					);
+					let q_xyz = [<$Name Wide>]::new(rot.x, rot.y, rot.z);
 
 					//	Math:	q X (q X v + v*w)
 					let t1 = q_xyz.cross(v_xyz) + (v_xyz * q_w);
 					let res = v_xyz + (q_xyz.cross(t1) * <$Wide>::from_num(2))
 
 					//	Downconversion
-					res.to() //	Handy hack from implementing .to()
+					res.to()
 				}
 			}
 
@@ -111,7 +107,9 @@ macro_rules! define_fixed_vec3 {
                 #[inline(always)] fn y(&self) -> $Wide { self.y }
                 #[inline(always)] fn z(&self) -> $Wide { self.z }
 
-				#[inline] fn to_f64(self) -> DVec3 { self.to_f64() }
+				#[inline] fn to_f64(self) -> DVec3 {
+					DVec3::new(self.x.to_num(), self.y.to_num(), self.z.to_num())
+				}
 
 				//	Arithmetic ops
 				#[inline] fn dot(self, other: Self) -> $Wide { self.dot(other) }
@@ -141,11 +139,19 @@ macro_rules! define_fixed_vec3 {
 		}
 
 		impl $Name {
-			//	Constructors
+			//		Constructors
+			//	No zero constructor - easy to define const
 			pub const ZERO: Self = Self { x: <$Scalar>::ZERO, y: <$Scalar>::ZERO, z: <$Scalar>::ZERO }
-			#[inline(always)] pub fn new(x: $Scalar, y: $Scalar, z: $Scalar) -> Self { Self{ x, y, z } }
 
-			//	Access/conversion
+			//	boilerplate: new() constructor accepts any type with trait ToFixed
+			#[inline(always)] pub fn new<N: ToFixed>(x: N, y: N, z: N) -> Self { Self{ 
+				x: <$Scalar>::from_num(x),
+				y: <$Scalar>::from_num(y),
+				z: <$Scalar>::from_num(z), 
+			} }
+
+			//		Access/conversion
+			//	boilerplate: to() constructor casts to any type with trait FromFixed
 			#[inline] pub fn to<V>(self) -> V where 
 				V: TypeVec3, V::Scalar: FromFixed, 
 			{	V::new(
@@ -154,7 +160,7 @@ macro_rules! define_fixed_vec3 {
 					V::Scalar::from_num(self.z),
 			)	}
 
-			//	Algebraic ops
+			//		Algebraic ops
 			#[inline] pub fn dot(self, other: Self) -> $Scalar {
 				self.x * other.x + self.y * other.y + self.z * other.z
 			}
@@ -197,4 +203,67 @@ impl TypeVec3 for DVec3 {
 
 	//	Geometry
 	#[inline(always)] fn rotate(self, rot: DQuat) -> Self { rot * self }
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::f64::consts::PI;
+
+	const EPS_FIXED: FixOrigin = FixOrigin::DELTA;
+	const EPS_FP_FAR: FixOrigin = FixOrigin::ONE;
+
+	//		Tests
+	//	Construction
+	fn test_new_generic() {
+		let v_i64 = FixVec3::new(1, 2, 3);
+		let v_f64 = FixVec3::new(1., 2., 3.);
+		let v_mix = FixVec3::new(1, 2., 3f32);
+
+		assert_eq!(v_i64, v_f64);
+        assert_eq!(v_f64, v_mix);
+		assert_eq!(v_i64.x, FixOrigin::from_num(1));
+	}
+
+	//	Arithmetic
+	fn test_rot90() {
+		let vec = FixVec3::new(1, 0, 0);
+		let rot = DQuat::from_rotation_z(PI / 2.0);
+		let res = vec.rotate(rot);
+
+		//	Expected: (0, 1, 0)
+		assert!(res.x.abs() < EPS_FIXED, "X should be 0, got {:?}", res.x);
+		assert!((res.y-1).abs() < EPS_FIXED, "Y should be 1, got {:?}", res.y);
+	}
+
+	//	Stability
+	fn test_far_stable() {
+		let far_dist = 1.5e13;
+
+		let far = FixVec3::new(far_dist, 0, 0);
+		let rot = DQuat::from_rotation_z(PI / 2.0);
+		let res = far.rotate(rot);
+
+		//	Check: magnitude preserved?
+		let expect_2 = far.mag2();
+		let length_2 = res.mag2();
+		let diff = (length_2-expect_2).abs();
+		assert!(diff < EPS_FP_FAR);
+
+		//	Check: correctness
+		assert!(res.x.abs() < EPS_FP_FAR);
+		assert!(res.y - FixOrigin::from_num(far_dist) < EPS_FP_FAR)
+	}
+
+	fn test_far_precise() {
+		let q = DQuat::from_rotation_z(0.12345);
+        let q_ = q.inverse();
+
+		let start = FixVec3::new(1, 0, 0);
+        let rotated = start.rotate(q);
+        let recovered = rotated.rotate(q_);
+
+        let err = (recovered - start).mag2();
+        assert!(err < EPS_FIXED);
+	}
 }
